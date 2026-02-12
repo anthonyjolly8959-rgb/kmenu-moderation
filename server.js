@@ -1,8 +1,18 @@
 const express = require('express');
+const cors = require('cors');
 const multer = require('multer');
 const vision = require('@google-cloud/vision');
 
 const app = express();
+app.use(cors({
+  origin: [
+    'http://localhost:8004',
+    'http://localhost:5173',
+    'capacitor://localhost'
+  ],
+  methods: ['POST'],
+  allowedHeaders: ['Content-Type', 'x-client-secret']
+}));
 const upload = multer({
   limits: { fileSize: 2 * 1024 * 1024 } // 2MB max
 });
