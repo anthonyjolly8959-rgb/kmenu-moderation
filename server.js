@@ -7,27 +7,9 @@ const upload = multer({
   limits: { fileSize: 2 * 1024 * 1024 } // 2MB max
 });
 const CLIENT_SECRET = process.env.CLIENT_SECRET || 'TA_CLE_SECRETE_ICI';
-
-function createVisionClient() {
-  // Preferred for cloud deploys (Render): set GOOGLE_CREDENTIALS_JSON
-  if (process.env.GOOGLE_CREDENTIALS_JSON) {
-    const parsed = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
-    return new vision.ImageAnnotatorClient({
-      credentials: {
-        client_email: parsed.client_email,
-        private_key: parsed.private_key
-      },
-      projectId: parsed.project_id
-    });
-  }
-
-  // Local dev fallback
-  return new vision.ImageAnnotatorClient({
-    keyFilename: './google-vision-key.json'
-  });
-}
-
-const client = createVisionClient();
+const client = new vision.ImageAnnotatorClient({
+  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS || '/etc/secrets/google-vision-key.json'
+});
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true });
