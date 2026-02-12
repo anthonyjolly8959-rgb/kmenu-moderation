@@ -4,13 +4,24 @@ const multer = require('multer');
 const vision = require('@google-cloud/vision');
 
 const app = express();
+const allowedOrigins = new Set([
+  'capacitor://localhost',
+  'http://localhost',
+  'https://localhost',
+  'http://localhost:8004',
+  'http://localhost:5173'
+]);
 app.use(cors({
-  origin: [
-    'http://localhost:8004',
-    'http://localhost:5173',
-    'capacitor://localhost'
-  ],
-  methods: ['POST'],
+  origin: (origin, cb) => {
+    // Allow non-browser clients (curl/server-to-server)
+    if (!origin) return cb(null, true);
+    // Allow localhost dev ports and capacitor origins
+    if (allowedOrigins.has(origin) || /^https?:\/\/localhost(:\d+)?$/.test(origin)) {
+      return cb(null, true);
+    }
+    return cb(new Error('cors_not_allowed'));
+  },
+  methods: ['POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'x-client-secret']
 }));
 const upload = multer({
@@ -37,10 +48,12 @@ app.post('/moderate-image', upload.single('image'), async (req, res) => {
     }
 
     const [result] = await client.safeSearchDetection(req.file.buffer);
+    console.log("VISION RAW RESULT:", JSON.stringify(result, null, 2));
     const safe = result?.safeSearchAnnotation || null;
 
     // Strict moderation: missing SafeSearch payload is treated as blocked.
     if (!safe) {
+      console.log("SAFE IS NULL");
       return res.json({
         decision: 'BLOCK',
         scores: null,
@@ -48,12 +61,25 @@ app.post('/moderate-image', upload.single('image'), async (req, res) => {
       });
     }
 
-    const adultLevels = ['POSSIBLE', 'LIKELY', 'VERY_LIKELY'];
-    const racyLevels = ['LIKELY', 'VERY_LIKELY'];
+    const map = {
+      UNKNOWN: 0,
+      VERY_UNLIKELY: 1,
+      UNLIKELY: 2,
+      POSSIBLE: 3,
+      LIKELY: 4,
+      VERY_LIKELY: 5
+    };
+    const threshold = 4; // block only if LIKELY or above
+    console.log("THRESHOLD:", threshold);
+    console.log("SAFE OBJECT:", safe);
+    console.log("ADULT VALUE:", safe.adult, "=>", map[safe.adult]);
+    console.log("RACY VALUE:", safe.racy, "=>", map[safe.racy]);
+    console.log("VIOLENCE VALUE:", safe.violence, "=>", map[safe.violence]);
 
     const blocked =
-      adultLevels.includes(safe.adult) ||
-      racyLevels.includes(safe.racy);
+      (map[safe.adult] || 0) >= threshold ||
+      (map[safe.racy] || 0) >= threshold ||
+      (map[safe.violence] || 0) >= threshold;
 
     return res.json({
       decision: blocked ? 'BLOCK' : 'ALLOW',
