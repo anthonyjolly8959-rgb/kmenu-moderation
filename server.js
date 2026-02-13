@@ -69,17 +69,27 @@ app.post('/moderate-image', upload.single('image'), async (req, res) => {
       LIKELY: 4,
       VERY_LIKELY: 5
     };
-    const threshold = 4; // block only if LIKELY or above
-    console.log("THRESHOLD:", threshold);
+    // Tuned to reduce false positives:
+    // - adult: block from LIKELY+
+    // - racy: block only at VERY_LIKELY
+    // - violence: block only at VERY_LIKELY
+    const ADULT_THRESHOLD = 4; // LIKELY
+    const RACY_THRESHOLD = 5; // VERY_LIKELY
+    const VIOLENCE_THRESHOLD = 5; // VERY_LIKELY
+    console.log("THRESHOLDS:", {
+      ADULT_THRESHOLD,
+      RACY_THRESHOLD,
+      VIOLENCE_THRESHOLD
+    });
     console.log("SAFE OBJECT:", safe);
     console.log("ADULT VALUE:", safe.adult, "=>", map[safe.adult]);
     console.log("RACY VALUE:", safe.racy, "=>", map[safe.racy]);
     console.log("VIOLENCE VALUE:", safe.violence, "=>", map[safe.violence]);
 
     const blocked =
-      (map[safe.adult] || 0) >= threshold ||
-      (map[safe.racy] || 0) >= threshold ||
-      (map[safe.violence] || 0) >= threshold;
+      (map[safe.adult] || 0) >= ADULT_THRESHOLD ||
+      (map[safe.racy] || 0) >= RACY_THRESHOLD ||
+      (map[safe.violence] || 0) >= VIOLENCE_THRESHOLD;
 
     return res.json({
       decision: blocked ? 'BLOCK' : 'ALLOW',
